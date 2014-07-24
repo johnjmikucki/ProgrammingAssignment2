@@ -3,7 +3,18 @@
 ## 
 ## Structure shamelessly stolen from examples in Peng's README.md,
 ## refined a bit of my own design.
-
+##
+## Usage:
+## > mmm = makeCacheMatrix(matrix(c(1,2,3,4), nrow=2, ncol=2))
+## > cacheSolve(mmm)
+##        [,1] [,2]
+## [1,]   -2  1.5
+## [2,]    1 -0.5
+## > cacheSolve(mmm)
+## getting cached data
+##        [,1] [,2]
+## [1,]   -2  1.5
+## [2,]    1 -0.5
 
 ## Apparently R doesn't do OOP, so we cobble together what amounts to a function-pointer table.  
 
@@ -20,35 +31,37 @@ makeCacheMatrix <- function(x = matrix()) {
   # accessor for our matrix
   getfn <- function() { x }
 
-  # accessor for the matrix's inverse
-  getinversefn <- function() { inverse }
+  # accessor for the matrix's inverse.
+  # I moved this logic up from cacheSolve, which is IMHO vestigial and really belongs here-- I 
+  # shouldn't need an external helper function to do my memoization here, and if R stylistically
+  # wants one as syntactic sugar, let's make it obvious that's all it is.
+  # 
+  getinversefn <- function() { 
+    # grab memoized field from parent frame
+    inverse ->> temp
+    
+    if(is.null(temp)) {
+      temp  <- solve(x)  # first time, compute 
+      inverse <<- temp   # ...and memoize result    
+    } else {
+      message("getting cached data")
+    }
+    
+    temp # return result
+  }
   
-  # this desperately wants to be a private method
-  # Better yet, both this and the compute logic should be inside the 'get' logic
-  setinversefn <- function(inv) { inverse <<- inv } # god this is so bad
-  
-  # build our function-pointer table.  The wierd 'x=x' syntax is because we're naming the functionpointers...
+  # build our function-pointer table.  I prefer the functions to have 'fn' suffixes so I can tell them
+  # from the names we're binding to...
   list(set = setfn, 
-       get = getfn,
-       setinverse = setinversefn,
-       getinverse = getinversefn)
+       get = getfn,       
+       getinverse = getinversefn
+       #setinverse should never have been here IMHO.
+      )
 }
 
 
-## This is terrible.  The memoization should take place in makeCacheMatrix' get() method
-## first
-## 
+## Syntactic sugar 
 cacheSolve <- function(x, ...) {
-  
   ## Return a matrix that is the inverse of 'x'
-  
-  inv <- x$getinverse()
-  if(!is.null(inv)) {
-    message("getting cached data")
-    return(inv)
-  }
-  data <- x$get()
-  m <- solve(data, ...)
-  x$setinverse(m)
-  m
+  x$getinverse()
 }
